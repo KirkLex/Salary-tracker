@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="auto">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Финансы</title>
+  <script>
+    (function () {
+      try {
+        var settings = JSON.parse(localStorage.getItem("salary-tracker-settings") || "{}");
+        if (settings.theme === "light" || settings.theme === "dark" || settings.theme === "auto") {
+          document.documentElement.dataset.theme = settings.theme;
+        }
+      } catch (error) {
+        document.documentElement.dataset.theme = "auto";
+      }
+    })();
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="page">
+    <header class="topbar">
+      <div class="brand">
+        <span class="mark" aria-hidden="true"></span>
+        <div>
+          <p class="eyebrow">Личный учёт</p>
+          <h1>Финансы</h1>
+        </div>
+      </div>
+      <div class="toolbar">
+        <div class="segment" id="theme-switch" role="group" aria-label="Тема">
+          <button type="button" data-theme-choice="light">Светлая</button>
+          <button type="button" data-theme-choice="dark">Тёмная</button>
+          <button type="button" data-theme-choice="auto">Авто</button>
+        </div>
+        <label class="field compact">
+          <span>Период</span>
+          <select id="period">
+            <option value="month">Текущий месяц</option>
+            <option value="all">Всё время</option>
+            <option value="custom">Свои даты</option>
+          </select>
+        </label>
+        <label class="field compact" id="custom-from" hidden>
+          <span>С</span>
+          <input type="date" id="date-from">
+        </label>
+        <label class="field compact" id="custom-to" hidden>
+          <span>По</span>
+          <input type="date" id="date-to">
+        </label>
+        <label class="field compact">
+          <span>Валюта учёта</span>
+          <select id="currency"></select>
+        </label>
+      </div>
+    </header>
+
+    <nav class="tabs" aria-label="Разделы">
+      <button type="button" class="is-active" data-view="summary">Сводка</button>
+      <button type="button" data-view="flow">Динамика</button>
+      <button type="button" data-view="categories">Категории</button>
+      <button type="button" data-view="transactions">Операции</button>
+      <button type="button" data-view="accounts">Счета</button>
+      <button type="button" data-view="budget">Бюджет</button>
+      <button type="button" data-view="recurring">Повторы</button>
+      <button type="button" data-view="goals">Цели</button>
+      <button type="button" data-view="report">Отчёт</button>
+      <button type="button" data-view="data">Данные</button>
+    </nav>
+    <p class="banner" id="due-banner" hidden></p>
+
+    <div class="stage">
+    <section class="view is-active" data-view-panel="summary">
+      <div class="section-head">
+        <div>
+          <h2 id="overview-title">Этот месяц</h2>
+          <p id="overview-caption">Движение денег за выбранный период</p>
+        </div>
+      </div>
+
+      <section class="summary" aria-label="Сводка">
+        <article class="card">
+          <p class="card-label">Доходы</p>
+          <p class="card-value income" id="income-total">0</p>
+        </article>
+        <article class="card">
+          <p class="card-label">Расходы</p>
+          <p class="card-value expense" id="expense-total">0</p>
+        </article>
+        <article class="card">
+          <p class="card-label">Баланс</p>
+          <p class="card-value" id="balance-total">0</p>
+        </article>
+      </section>
+    </section>
+
+    <section class="view" data-view-panel="flow" aria-hidden="true">
+      <article class="panel">
+        <div class="panel-head">
+          <h2>Доходы и расходы</h2>
+          <p id="bar-caption">По дням текущего месяца</p>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="bar-chart" aria-label="Столбчатый график доходов и расходов"></canvas>
+          <p class="empty" id="bar-empty" hidden>За этот период операций нет</p>
+        </div>
+      </article>
+    </section>
+
+    <section class="view" data-view-panel="categories" aria-hidden="true">
+      <article class="panel chart-panel">
+        <div class="panel-head">
+          <h2>Расходы по категориям</h2>
+          <p>Свои категории, в том числе вложенные</p>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="donut-chart" aria-label="Кольцевая диаграмма расходов"></canvas>
+          <p class="empty" id="donut-empty" hidden>Расходов за период нет</p>
+        </div>
+      </article>
+      <article class="panel">
+        <div class="panel-head">
+          <h2>Категории</h2>
+          <p>Архив скрывает категорию из новых операций</p>
+        </div>
+        <form id="category-form" class="inline-form">
+          <input type="text" id="category-name" placeholder="Название" required maxlength="40">
+          <select id="category-type">
+            <option value="expense">Расход</option>
+            <option value="income">Доход</option>
+          </select>
+          <select id="category-parent"></select>
+          <button type="submit" class="btn btn-primary">Добавить</button>
+        </form>
+        <ul class="tx-list" id="category-list"></ul>
+      </article>
+    </section>
+
+    <section class="view" data-view-panel="transactions" aria-hidden="true">
+      <div class="workspace">
+        <article class="panel form-panel">
+          <div class="panel-head">
+            <h2 id="form-title">Новая операция</h2>
+          </div>
+          <form id="transaction-form" novalidate>
+            <input type="hidden" id="transaction-id">
+            <fieldset class="type-switch">
+              <legend class="sr-only">Тип операции</legend>
+              <label>
+                <input type="radio" name="type" value="income" checked>
+                <span>Доход</span>
+              </label>
+              <label>
+                <input type="radio" name="type" value="expense">
+                <span>Расход</span>
+              </label>
+              <label>
+                <input type="radio" name="type" value="transfer">
+                <span>Перевод</span>
+              </label>
+            </fieldset>
+            <label class="field">
+              <span>Счёт</span>
+              <select id="account" required></select>
+            </label>
+            <label class="field" id="target-field" hidden>
+              <span>На счёт</span>
+              <select id="target-account"></select>
+            </label>
+            <label class="field">
+              <span id="amount-label">Сумма</span>
+              <input type="number" id="amount" min="0.01" step="0.01" inputmode="decimal" required>
+            </label>
+            <label class="field" id="category-field">
+              <span>Категория</span>
+              <select id="category" required></select>
+            </label>
+            <label class="field">
+              <span>Дата</span>
+              <input type="date" id="date" required>
+            </label>
+            <label class="field">
+              <span>Комментарий</span>
+              <input type="text" id="note" maxlength="80" placeholder="Необязательно">
+            </label>
+            <p class="form-error" id="form-error" hidden></p>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary" id="submit-btn">Добавить</button>
+              <button type="button" class="btn btn-ghost" id="cancel-btn" hidden>Отмена</button>
+            </div>
+          </form>
+        </article>
+
+        <article class="panel">
+          <div class="panel-head">
+            <h2>Операции</h2>
+            <p id="list-caption">За текущий месяц</p>
+          </div>
+          <div class="filters">
+            <input type="search" id="search" placeholder="Поиск по комментарию">
+            <select id="filter-type">
+              <option value="all">Все типы</option>
+              <option value="income">Доходы</option>
+              <option value="expense">Расходы</option>
+              <option value="transfer">Переводы</option>
+            </select>
+            <select id="filter-category"></select>
+            <select id="filter-account"></select>
+          </div>
+          <ul class="tx-list" id="transaction-list"></ul>
+          <p class="empty static" id="list-empty" hidden>Операций за выбранный период нет</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="view" data-view-panel="report" aria-hidden="true">
+      <div class="section-head">
+        <div>
+          <h2 id="report-title">Отчёт за месяц</h2>
+          <p id="report-lead">Сравнение с прошлым месяцем</p>
+        </div>
+      </div>
+      <div class="summary" id="report-stats"></div>
+      <div class="report-grid">
+        <article class="panel">
+          <div class="panel-head">
+            <h2>Куда ушли деньги</h2>
+            <p>Категории расходов</p>
+          </div>
+          <ul class="meters" id="category-report"></ul>
+          <p class="empty static" id="category-empty" hidden>Расходов в этом месяце нет</p>
+        </article>
+        <article class="panel">
+          <div class="panel-head">
+            <h2>Крупные траты</h2>
+            <p>Пять самых больших расходов</p>
+          </div>
+          <ul class="tx-list" id="largest-list"></ul>
+          <p class="empty static" id="largest-empty" hidden>Расходов в этом месяце нет</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="view" data-view-panel="accounts" aria-hidden="true">
+      <article class="panel">
+        <div class="panel-head">
+          <h2>Счета</h2>
+          <p>У каждого счёта своя валюта. Перевод между ними считает курс.</p>
+        </div>
+        <form id="account-form" class="inline-form">
+          <input type="text" id="account-name" placeholder="Название" required maxlength="40">
+          <select id="account-currency"></select>
+          <input type="number" id="account-opening" min="0" step="0.01" placeholder="Начальный остаток" value="0">
+          <button type="submit" class="btn btn-primary">Добавить счёт</button>
+        </form>
+        <ul class="tx-list" id="account-list"></ul>
+      </article>
+    </section>
+
+    <section class="view" data-view-panel="budget" aria-hidden="true">
+      <article class="panel">
+        <div class="panel-head">
+          <h2>Бюджет месяца</h2>
+          <p id="budget-caption">План и факт по категориям расходов</p>
+        </div>
+        <ul class="meters" id="budget-list"></ul>
+      </article>
+    </section>
+
+    <section class="view" data-view-panel="recurring" aria-hidden="true">
+      <article class="panel">
+        <div class="panel-head">
+          <h2>Повторяющиеся операции</h2>
+          <p>Раз в месяц, в выбранный день</p>
+        </div>
+        <form id="recurring-form" class="stack-form">
+          <select id="recurring-type">
+            <option value="expense">Расход</option>
+            <option value="income">Доход</option>
+          </select>
+          <input type="number" id="recurring-amount" min="0.01" step="0.01" placeholder="Сумма" required>
+          <select id="recurring-category"></select>
+          <select id="recurring-account"></select>
+          <input type="number" id="recurring-day" min="1" max="28" value="1" required>
+          <input type="text" id="recurring-note" maxlength="80" placeholder="Комментарий">
+          <button type="submit" class="btn btn-primary">Сохранить повтор</button>
+        </form>
+        <ul class="tx-list" id="recurring-list"></ul>
+      </article>
+    </section>
+
+    <section class="view" data-view-panel="goals" aria-hidden="true">
+      <article class="panel">
+        <div class="panel-head">
+          <h2>Цели</h2>
+          <p>Отложенные суммы не входят в расходы</p>
+        </div>
+        <form id="goal-form" class="inline-form">
+          <input type="text" id="goal-name" placeholder="Название" required maxlength="40">
+          <input type="number" id="goal-target" min="1" step="0.01" placeholder="Цель" required>
+          <select id="goal-currency"></select>
+          <button type="submit" class="btn btn-primary">Добавить цель</button>
+        </form>
+        <ul class="tx-list" id="goal-list"></ul>
+      </article>
+    </section>
+
+    <section class="view" data-view-panel="data" aria-hidden="true">
+      <div class="report-grid">
+        <article class="panel">
+          <div class="panel-head">
+            <h2>Курсы</h2>
+            <p>Сколько сумов в одной единице валюты</p>
+          </div>
+          <form id="rates-form" class="stack-form"></form>
+        </article>
+        <article class="panel">
+          <div class="panel-head">
+            <h2>Копия данных</h2>
+            <p>CSV для операций, JSON для всего учёта</p>
+          </div>
+          <div class="form-actions">
+            <button type="button" class="btn btn-primary" id="export-csv">Скачать CSV</button>
+            <button type="button" class="btn btn-ghost" id="export-json">Скачать JSON</button>
+          </div>
+          <label class="field">
+            <span>Импорт CSV</span>
+            <input type="file" id="import-csv" accept=".csv,text/csv">
+          </label>
+          <label class="field">
+            <span>Импорт JSON</span>
+            <input type="file" id="import-json" accept=".json,application/json">
+          </label>
+          <p class="form-error" id="import-message" hidden></p>
+        </article>
+      </div>
+    </section>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/charts.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
