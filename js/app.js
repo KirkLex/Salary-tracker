@@ -10,6 +10,7 @@ const state = {
   filterAccount: "all",
   editingId: null,
   view: "summary",
+  threadDay: null,
 };
 
 const form = document.getElementById("transaction-form");
@@ -288,6 +289,85 @@ function renderSummary(items) {
   document.getElementById("bar-caption").textContent = state.period === "all" ? "По месяцам" : "По дням выбранного периода";
   document.getElementById("list-caption").textContent = `За ${periodCaption()}`;
   document.getElementById("overview-caption").textContent = `Суммы пересчитаны в ${settings.currency}`;
+  renderThread();
+}
+
+function renderThread() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const days = new Date(year, month + 1, 0).getDate();
+  const today = now.getDate();
+  const stamp = monthStamp(0);
+  const byDay = Array.from({ length: days }, () => ({ income: 0, expense: 0 }));
+  state.ledger.transactions
+    .filter((item) => item.date.startsWith(stamp) && item.type !== "transfer")
+    .forEach((item) => {
+      const index = Number(item.date.slice(8, 10)) - 1;
+      const amount = toDisplay(item.amount, accountById(item.accountId)?.currency || "UZS");
+      if (byDay[index] && item.type === "income") byDay[index].income += amount;
+      if (byDay[index] && item.type === "expense") byDay[index].expense += amount;
+    });
+  const income = byDay.reduce((sum, day) => sum + day.income, 0);
+  const expense = byDay.reduce((sum, day) => sum + day.expense, 0);
+  const spent = byDay.slice(0, today).reduce((sum, day) => sum + day.expense, 0);
+  const upcoming = state.ledger.recurring
+    .filter((item) => item.active && item.type === "expense" && Number(item.day) > today)
+    .filter((item) => !state.ledger.transactions.some((tx) => tx.recurringId === item.id && tx.date.startsWith(stamp)))
+    .reduce((sum, item) => sum + toDisplay(item.amount, accountById(item.accountId)?.currency || "UZS"), 0);
+  const pool = income - expense - upcoming;
+  const daysLeft = days - today + 1;
+  const allowance = pool / daysLeft;
+  const after = days - today;
+  if (!state.threadDay || state.threadDay < 1 || state.threadDay > days) {
+    let best = today;
+    let bestValue = -1;
+    byDay.forEach((day, index) => {
+      if (day.expense > bestValue) {
+        bestValue = day.expense;
+        best = index + 1;
+      }
+    });
+    state.threadDay = bestValue > 0 ? best : today;
+  }
+  const picked = state.threadDay;
+  const pickedSpend = byDay[picked - 1].expense;
+  const replayEnd = pool - pickedSpend * after;
+  const pace = today ? spent / today : 0;
+  const paceEnd = pool - pace * after;
+  const peak = Math.max(1, ...byDay.map((day) => Math.max(day.income, day.expense)));
+  const offset = (new Date(year, month, 1).getDay() + 6) % 7;
+  const blanks = Array.from({ length: offset }, () => `<span class="knot-blank"></span>`).join("");
+  const bar = (value) => `${value > 0 ? Math.max(8, Math.round((value / peak) * 22)) : 0}px`;
+  document.getElementById("thread-title").textContent = monthName(0);
+  const todayNode = document.getElementById("thread-today");
+  todayNode.textContent = formatMoney(allowance);
+  todayNode.classList.toggle("is-negative", allowance < 0);
+  document.getElementById("thread-hint").textContent = upcoming
+    ? `После трат и ещё ${formatMoney(upcoming)} повторов, на ${daysLeft} дн.`
+    : `Остаток месяца делится на ${daysLeft} дн.`;
+  const replayNode = document.getElementById("thread-replay");
+  const paceNode = document.getElementById("thread-pace");
+  replayNode.textContent = formatMoney(replayEnd);
+  paceNode.textContent = formatMoney(paceEnd);
+  replayNode.classList.toggle("is-negative", replayEnd < 0);
+  paceNode.classList.toggle("is-negative", paceEnd < 0);
+  document.getElementById("thread-strip").innerHTML = blanks + byDay.map((day, index) => {
+    const number = index + 1;
+    const future = number > today;
+    return `
+      <button type="button" class="knot${number === today ? " is-today" : ""}${number === picked ? " is-picked" : ""}${future ? " is-future" : ""}" data-thread-day="${number}" role="option" aria-selected="${number === picked}">
+        <span class="knot-plot" aria-hidden="true">
+          <span class="knot-in" style="height:${bar(day.income)}"></span>
+          <span class="knot-out" style="height:${bar(day.expense)}"></span>
+        </span>
+        <span class="knot-num">${number}</span>
+      </button>`;
+  }).join("");
+  const when = new Date(year, month, picked).toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
+  document.getElementById("thread-story").textContent = after
+    ? `${when}: расход ${formatMoney(pickedSpend)}. Так до конца месяца — цифра слева. Средний день до сегодня — цифра справа.`
+    : "Сегодня последний день месяца. Нить уже дошла до края.";
 }
 
 function renderLists() {
@@ -505,12 +585,14 @@ function showView(view) {
   const current = document.querySelector(`[data-view-panel="${state.view}"]`);
   const next = document.querySelector(`[data-view-panel="${view}"]`);
   if (!next || !current) return;
-  const order = [...document.querySelectorAll(".tabs [data-view]")].map((button) => button.dataset.view);
+  const order = ["summary", "flow", "categories", "transactions", "accounts", "budget", "recurring", "goals", "report", "data"];
   const dir = order.indexOf(view) > order.indexOf(state.view) ? "forward" : "back";
   state.view = view;
-  document.querySelectorAll(".tabs [data-view]").forEach((button) => {
+  document.querySelectorAll("[data-view]").forEach((button) => {
     button.classList.toggle("is-active", button.dataset.view === view);
   });
+  document.getElementById("more-sheet").hidden = true;
+  document.getElementById("more-open").classList.toggle("is-active", !["summary", "transactions", "budget", "report"].includes(view));
   const reveal = () => {
     current.classList.remove("is-active", "is-leaving");
     current.setAttribute("aria-hidden", "true");
@@ -787,6 +869,31 @@ document.getElementById("theme-switch").addEventListener("click", (event) => {
 document.querySelector(".tabs").addEventListener("click", (event) => {
   const view = event.target.closest("[data-view]")?.dataset.view;
   if (view) showView(view);
+});
+document.querySelector(".side-links").addEventListener("click", (event) => {
+  const view = event.target.closest("[data-view]")?.dataset.view;
+  if (view) showView(view);
+});
+document.querySelector(".dock").addEventListener("click", (event) => {
+  const view = event.target.closest("[data-view]")?.dataset.view;
+  if (view) showView(view);
+});
+document.getElementById("more-open").addEventListener("click", () => {
+  document.getElementById("more-sheet").hidden = false;
+});
+document.getElementById("more-sheet").addEventListener("click", (event) => {
+  if (event.target.id === "more-close" || event.target.id === "more-sheet") {
+    document.getElementById("more-sheet").hidden = true;
+    return;
+  }
+  const view = event.target.closest("[data-view]")?.dataset.view;
+  if (view) showView(view);
+});
+document.getElementById("thread-strip").addEventListener("click", (event) => {
+  const day = event.target.closest("[data-thread-day]")?.dataset.threadDay;
+  if (!day) return;
+  state.threadDay = Number(day);
+  renderThread();
 });
 
 listBody.addEventListener("click", (event) => {

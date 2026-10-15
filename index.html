@@ -18,13 +18,35 @@
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,560;9..144,680&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <div class="page">
-    <header class="topbar">
+  <div class="shell">
+    <aside class="sidenav">
       <div class="brand">
+        <span class="mark" aria-hidden="true"></span>
+        <div>
+          <p class="eyebrow">Личный учёт</p>
+          <h1>Финансы</h1>
+        </div>
+      </div>
+      <nav class="side-links" aria-label="Разделы">
+        <button type="button" class="nav-btn is-active" data-view="summary">Сводка</button>
+        <button type="button" class="nav-btn" data-view="flow">Динамика</button>
+        <button type="button" class="nav-btn" data-view="categories">Категории</button>
+        <button type="button" class="nav-btn" data-view="transactions">Операции</button>
+        <button type="button" class="nav-btn" data-view="accounts">Счета</button>
+        <button type="button" class="nav-btn" data-view="budget">Бюджет</button>
+        <button type="button" class="nav-btn" data-view="recurring">Повторы</button>
+        <button type="button" class="nav-btn" data-view="goals">Цели</button>
+        <button type="button" class="nav-btn" data-view="report">Отчёт</button>
+        <button type="button" class="nav-btn" data-view="data">Данные</button>
+      </nav>
+    </aside>
+    <div class="page">
+    <header class="topbar">
+      <div class="brand brand-inline">
         <span class="mark" aria-hidden="true"></span>
         <div>
           <p class="eyebrow">Личный учёт</p>
@@ -76,12 +98,35 @@
 
     <div class="stage">
     <section class="view is-active" data-view-panel="summary">
-      <div class="section-head">
-        <div>
-          <h2 id="overview-title">Этот месяц</h2>
-          <p id="overview-caption">Движение денег за выбранный период</p>
+      <article class="thread">
+        <div class="thread-head">
+          <div>
+            <p class="eyebrow">Нить месяца</p>
+            <h2 id="thread-title">Этот месяц</h2>
+            <p class="thread-lead">Нажмите прошедший день — остаток месяца проживёт его тратами.</p>
+          </div>
+          <div class="thread-now">
+            <p class="card-label">Свободно сегодня</p>
+            <p class="thread-amount" id="thread-today">0</p>
+            <p class="thread-hint" id="thread-hint"></p>
+          </div>
         </div>
-      </div>
+        <div class="thread-compare">
+          <div>
+            <p class="card-label">Если повторить день</p>
+            <p class="thread-amount" id="thread-replay">0</p>
+          </div>
+          <div>
+            <p class="card-label">Если держать темп</p>
+            <p class="thread-amount" id="thread-pace">0</p>
+          </div>
+        </div>
+        <p class="thread-story" id="thread-story"></p>
+        <div class="thread-week" aria-hidden="true"><span>Пн</span><span>Вт</span><span>Ср</span><span>Чт</span><span>Пт</span><span>Сб</span><span>Вс</span></div>
+        <div class="thread-strip" id="thread-strip" role="listbox" aria-label="Дни месяца"></div>
+      </article>
+      <h2 id="overview-title" class="sr-only">Этот месяц</h2>
+      <p id="overview-caption" class="sr-only">Движение денег за выбранный период</p>
 
       <section class="summary" aria-label="Сводка">
         <article class="card">
@@ -340,6 +385,26 @@
         </article>
       </div>
     </section>
+    </div>
+    </div>
+  </div>
+  <nav class="dock" aria-label="Разделы на узком экране">
+    <button type="button" class="nav-btn is-active" data-view="summary"><span>Сводка</span></button>
+    <button type="button" class="nav-btn" data-view="transactions"><span>Операции</span></button>
+    <button type="button" class="nav-btn" data-view="budget"><span>Бюджет</span></button>
+    <button type="button" class="nav-btn" data-view="report"><span>Отчёт</span></button>
+    <button type="button" id="more-open"><span>Ещё</span></button>
+  </nav>
+  <div class="sheet" id="more-sheet" hidden>
+    <div class="sheet-card">
+      <p class="eyebrow">Ещё разделы</p>
+      <button type="button" class="nav-btn" data-view="flow">Динамика</button>
+      <button type="button" class="nav-btn" data-view="categories">Категории</button>
+      <button type="button" class="nav-btn" data-view="accounts">Счета</button>
+      <button type="button" class="nav-btn" data-view="recurring">Повторы</button>
+      <button type="button" class="nav-btn" data-view="goals">Цели</button>
+      <button type="button" class="nav-btn" data-view="data">Данные</button>
+      <button type="button" class="btn btn-ghost" id="more-close">Закрыть</button>
     </div>
   </div>
 
