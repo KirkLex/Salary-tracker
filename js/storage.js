@@ -183,8 +183,15 @@ function loadLedger(currency) {
   return seeded;
 }
 
+let ledgerSync = null;
+
+function setLedgerSync(fn) {
+  ledgerSync = fn;
+}
+
 function saveLedger(ledger) {
   localStorage.setItem(LEDGER_KEY, JSON.stringify(ledger));
+  if (ledgerSync) ledgerSync(ledger);
 }
 
 function loadSettings() {

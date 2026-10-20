@@ -1042,9 +1042,120 @@ window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () 
 
 ChartBoard.setFormatter(formatMoney);
 applyTheme(settings.theme);
-fillCurrency();
-dateInput.value = todayIso();
-fillAccounts(accountSelect);
-fillAccounts(targetSelect);
-fillCategories();
-paint();
+
+const authForm = document.getElementById("auth-form");
+const authEmail = document.getElementById("auth-email");
+const authPassword = document.getElementById("auth-password");
+const authError = document.getElementById("auth-error");
+const authSubmit = document.getElementById("auth-submit");
+const authLead = document.getElementById("auth-lead");
+let authMode = "login";
+let syncTimer = 0;
+
+function showAuthError(message) {
+  authError.hidden = !message;
+  authError.textContent = message || "";
+}
+
+async function api(path, options = {}) {
+  const response = await fetch(path, {
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+    ...options,
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || "Запрос не выполнен");
+  return data;
+}
+
+function openApp() {
+  document.getElementById("auth-gate").hidden = true;
+  document.getElementById("app-shell").hidden = false;
+  fillCurrency();
+  dateInput.value = dateInput.value || todayIso();
+  fillAccounts(accountSelect);
+  fillAccounts(targetSelect);
+  fillCategories();
+  paint();
+}
+
+async function pullLedger() {
+  const remote = await api("/api/ledger");
+  if (remote.ledger) {
+    setLedgerSync(null);
+    state.ledger = normalizeLedger(remote.ledger, settings.currency);
+    saveLedger(state.ledger);
+  } else {
+    state.ledger = loadLedger(settings.currency);
+    await api("/api/ledger", { method: "PUT", body: JSON.stringify({ ledger: state.ledger }) });
+  }
+  setLedgerSync((ledger) => {
+    window.clearTimeout(syncTimer);
+    syncTimer = window.setTimeout(() => {
+      fetch("/api/ledger", {
+        method: "PUT",
+        credentials: "same-origin",
+        keepalive: true,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ledger }),
+      });
+    }, 400);
+  });
+}
+
+async function logout() {
+  await fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" });
+  window.location.reload();
+}
+
+document.getElementById("auth-mode").addEventListener("click", (event) => {
+  const mode = event.target.closest("[data-auth-mode]")?.dataset.authMode;
+  if (!mode) return;
+  authMode = mode;
+  document.querySelectorAll("[data-auth-mode]").forEach((button) => {
+    button.classList.toggle("is-active", button.dataset.authMode === mode);
+  });
+  authSubmit.textContent = mode === "register" ? "Создать аккаунт" : "Войти";
+  authLead.textContent = mode === "register"
+    ? "Создайте аккаунт. Пароль хранится только в виде шифра."
+    : "Войдите, чтобы открыть свой учёт. Данные хранятся в вашем аккаунте.";
+  authPassword.autocomplete = mode === "register" ? "new-password" : "current-password";
+  showAuthError("");
+});
+
+authForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  showAuthError("");
+  authSubmit.disabled = true;
+  try {
+    await api(authMode === "register" ? "/api/auth/register" : "/api/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ email: authEmail.value, password: authPassword.value }),
+    });
+    await pullLedger();
+    openApp();
+  } catch (error) {
+    showAuthError(error.message);
+  } finally {
+    authSubmit.disabled = false;
+  }
+});
+
+document.querySelectorAll(".js-logout").forEach((button) => {
+  button.addEventListener("click", logout);
+});
+
+boot();
+
+async function boot() {
+  try {
+    const me = await api("/api/auth/me");
+    if (!me.user) return;
+    await pullLedger();
+    openApp();
+  } catch {
+    if (location.protocol === "file:") {
+      showAuthError("Откройте опубликованный сайт. Из файла на диске вход не работает.");
+    }
+  }
+}

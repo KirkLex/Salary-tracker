@@ -22,7 +22,33 @@
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <div class="shell">
+  <div class="auth-gate" id="auth-gate">
+    <form id="auth-form" class="auth-card">
+      <div class="brand">
+        <span class="mark" aria-hidden="true"></span>
+        <div>
+          <p class="eyebrow">Личный учёт</p>
+          <h1>Финансы</h1>
+        </div>
+      </div>
+      <p class="thread-lead" id="auth-lead">Войдите, чтобы открыть свой учёт. Данные хранятся в вашем аккаунте.</p>
+      <div class="segment" id="auth-mode" role="group" aria-label="Вход или регистрация">
+        <button type="button" data-auth-mode="login" class="is-active">Вход</button>
+        <button type="button" data-auth-mode="register">Регистрация</button>
+      </div>
+      <label class="field">
+        <span>Почта</span>
+        <input type="email" id="auth-email" autocomplete="username" required maxlength="200" placeholder="name@mail.com">
+      </label>
+      <label class="field">
+        <span>Пароль</span>
+        <input type="password" id="auth-password" autocomplete="current-password" required minlength="8" maxlength="72" placeholder="Не короче 8 символов">
+      </label>
+      <p class="form-error" id="auth-error" hidden></p>
+      <button type="submit" class="btn btn-primary" id="auth-submit">Войти</button>
+    </form>
+  </div>
+  <div class="shell" id="app-shell" hidden>
     <aside class="sidenav">
       <div class="brand">
         <span class="mark" aria-hidden="true"></span>
@@ -43,6 +69,7 @@
         <button type="button" class="nav-btn" data-view="report">Отчёт</button>
         <button type="button" class="nav-btn" data-view="data">Данные</button>
       </nav>
+      <button type="button" class="nav-btn js-logout">Выйти</button>
     </aside>
     <div class="page">
     <header class="topbar">
@@ -79,6 +106,7 @@
           <span>Валюта учёта</span>
           <select id="currency"></select>
         </label>
+        <button type="button" class="btn btn-ghost js-logout">Выйти</button>
       </div>
     </header>
 
@@ -404,6 +432,7 @@
       <button type="button" class="nav-btn" data-view="recurring">Повторы</button>
       <button type="button" class="nav-btn" data-view="goals">Цели</button>
       <button type="button" class="nav-btn" data-view="data">Данные</button>
+      <button type="button" class="nav-btn js-logout">Выйти</button>
       <button type="button" class="btn btn-ghost" id="more-close">Закрыть</button>
     </div>
   </div>
