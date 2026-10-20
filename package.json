@@ -1,6 +1,10 @@
 {
   "name": "salary-tracker",
   "private": true,
+  "scripts": {
+    "dev:landing": "npm run dev --prefix landing",
+    "build": "npm ci --prefix landing && npm run build --prefix landing && node scripts/assemble-site.mjs"
+  },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2"
   }
